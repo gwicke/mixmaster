@@ -5,7 +5,7 @@ const EleMatch = require('elematch');
 
 // Strawman
 function test() {
-    const handler = function(node) { return function() { return node; }; };
+    const handler = function(node) { return function() { return node.outerHTML; }; };
     const matcher = new EleMatch({
         'test-element[foo="bar"]': handler,
         'foo-bar': handler,
