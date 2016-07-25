@@ -1,0 +1,22 @@
+{
+  "name": "wikimedia-mixmaster",
+  "version": "0.0.0",
+  "description": "Merge and transform web streams and templates into one ReadableStream.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gwicke/mixmaster.git"
+  },
+  "author": "Gabriel Wicke <gwicke@wikimedia.org>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/gwicke/mixmaster/issues"
+  },
+  "dependencies": {
+    "elematch": "git://github.com/wikimedia/elematch",
+    "web-streams-polyfill": "^1.2.2"
+  }
+}
