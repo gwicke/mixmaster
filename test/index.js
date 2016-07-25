@@ -11,10 +11,9 @@ function test() {
         'foo-bar': handler,
     });
     const matchFn = matcher.matchAll.bind(matcher);
-    const testDoc = "<html><body><div>"
+    const inStream = mm.makeArrayStream(["<html><body><div>"
         + "<test-element foo='bar'>foo</test-element>"
-        + "</div></body>";
-    const inStream = mm.makeArrayStream([testDoc]);
+        + "</div></body>"]);
     const transformedStream = mm.transformStream(inStream, [
             mm.matchTransform(matchFn),
             mm.evalTransform({})
@@ -27,7 +26,7 @@ function test() {
             if (res.done) {
                 return;
             }
-            console.log(res.value);
+            console.log('chunk:', res.value);
             return readChunk();
         })
         .catch(e => console.log(e.stack));
