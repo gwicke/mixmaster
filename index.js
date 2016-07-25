@@ -48,8 +48,8 @@ function transformStream(input, transforms, options) {
     }
 
     // Set up the pipeline
-    transforms.forEach(function(makeTransform) {
-        reader = makeTransform(reader);
+    transforms.forEach(function(makeReader) {
+        reader = makeReader(reader);
     });
 
     // Pipe the last element of our pipeline to the outStream.
