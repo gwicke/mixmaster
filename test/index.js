@@ -53,7 +53,6 @@ function evalTemplate(tpl) {
 
 mm.streamToArray(tplStream)
     .then((tpl) => {
-        console.log(tpl);
         var startTime = Date.now();
         var n = 100000;
         function iter(i) {

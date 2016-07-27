@@ -17,6 +17,6 @@
   },
   "dependencies": {
     "elematch": "git://github.com/wikimedia/elematch",
-    "web-streams-polyfill": "^1.2.2"
+    "web-streams-polyfill": "git+https://github.com/gwicke/web-streams-polyfill#spec_performance_improvements"
   }
 }
