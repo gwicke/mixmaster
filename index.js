@@ -1,8 +1,29 @@
 'use strict';
 
+// Benchmarking option. Results of simple repeat eval loop, with minor
+// performance tweaks in the stream reference implementation:
+//
+// node 4.4, native promise: 0.060 ms/iteration
+// node 4.4, bluebird:       0.022 ms/iteration
+// node 6.3, native promise: 0.061 ms/iteration
+// node 6.3, bluebird:       0.014 ms/iteration
+//
+// global.Promise = require('bluebird');
 const ReadableStream = require("web-streams-polyfill").ReadableStream;
 
-// Duck-typed ReadableStream wrapping an array.
+function readReturn(value, done) {
+    return {
+        value: value,
+        done: done,
+    };
+}
+
+/**
+ * Duck-typed ReadableStream wrapping an array.
+ *
+ * @param {Array} arr, the array to wrap into a stream.
+ * @return {ReadableStream}
+ */
 function makeArrayStream(arr) {
     let i = 0;
     return {
@@ -10,17 +31,11 @@ function makeArrayStream(arr) {
             return {
                 read: () => {
                     if (i < arr.length) {
-                        let j = i;
+                        let val = arr[i];
                         i++;
-                        return Promise.resolve({
-                            value: arr[j],
-                            done: false,
-                        });
+                        return Promise.resolve(readReturn(val, false));
                     } else {
-                        return Promise.resolve({
-                            value: undefined,
-                            done: true,
-                        });
+                        return Promise.resolve(readReturn(undefined, true));
                     }
                 }
             };
@@ -29,8 +44,42 @@ function makeArrayStream(arr) {
 }
 
 /**
+ * @param {ReadableStream or Reader} stream, the stream or reader to convert
+ * to an array
+ * @return {Promise<Array>}, array containing chunks of the stream.
+ */
+function streamToArray(stream) {
+    let reader;
+    if (stream && stream._readableStreamController) {
+        reader = stream.getReader();
+    } else if (stream && stream.read) {
+        reader = stream;
+    } else {
+        throw new TypeError("A stream is required.");
+    }
+
+    let accum = [];
+    function pump() {
+        return reader.read()
+            .then(res => {
+                if (res.done) { return accum; }
+                accum.push(res.value);
+                return pump();
+            });
+    }
+    return pump();
+}
+
+
+/**
  * Apply several "remix" transforms to a stream, and return a
  * ReadableStream.
+ *
+ * @param {ReadableStream|Array} input
+ * @param {Array} transforms, array of functions taking a Reader & returning a
+ * Reader interface.
+ * @param {object} options, options passed to the ReadableStream constructor.
+ * @return {ReadableStream}
  */
 function transformStream(input, transforms, options) {
     // Questions
@@ -56,6 +105,14 @@ function transformStream(input, transforms, options) {
     return new ReadableStream(readerToUnderlyingSource(reader), options);
 }
 
+/**
+ * Wrap a synchronous string match function returning matches & remainder
+ * properties in a Reader transform.
+ *
+ * @param {function} matchFn, a function(chunk: string) ->
+ *                   { matches: [Array<string>], remainder: string }
+ * @return {function(Reader) -> Reader}
+ */
 function matchTransform(matchFn) {
     return function makeReader(reader) {
         let curMatch = {
@@ -66,10 +123,15 @@ function matchTransform(matchFn) {
             // No start() handler.
             read: function read() {
                 if (curMatch.matches.length) {
-                    return Promise.resolve({
-                        value: curMatch.matches.shift(),
-                        done: false,
-                    });
+                    let chunk = curMatch.matches.shift();
+                    if (typeof chunk === 'string') {
+                        // Coalesce string chunks for efficiency
+                        while (curMatch.matches.length
+                                && (typeof curMatch.matches[0]) === 'string') {
+                            chunk += curMatch.matches.shift();
+                        }
+                    }
+                    return Promise.resolve(readReturn(chunk, false));
                 } else {
                     return reader.read()
                         .then(res => {
@@ -79,10 +141,7 @@ function matchTransform(matchFn) {
                                     curMatch.remainder = '';
                                     return read();
                                 }
-                                return {
-                                    value: undefined,
-                                    done: true,
-                                };
+                                return readReturn(undefined, true);
                             }
                             curMatch = matchFn(curMatch.remainder + res.value);
                             return read();
@@ -94,6 +153,16 @@ function matchTransform(matchFn) {
     };
 }
 
+/**
+ * Chunk evaluation transform:
+ * - functions are called with ctx parameter,
+ * - Promises are resolved to a value,
+ * - ReadableStreams are spliced into the main string, and
+ * - all other types are passed through unchanged.
+ *
+ * @param {object} ctx, a context object passed to function chunks.
+ * @return {function(Reader) -> Reader}
+ */
 function evalTransform(ctx) {
     return function makeReader(reader) {
         let activeStreamReader = null;
@@ -121,23 +190,19 @@ function evalTransform(ctx) {
                             chunk = chunk(ctx);
                         }
 
-                        if (chunk instanceof ReadableStream) {
-                            activeStreamReader = chunk.getReader();
-                            return read();
-                        } else if (chunk.then) {
-                            // Duck typed Promise
-                            return chunk.then(val => {
-                                return {
-                                    value: val,
-                                    done: false,
-                                };
-                            });
-                        } else {
-                            return {
-                                value: chunk,
-                                done: false,
-                            };
+                        if (chunk) {
+                            if (chunk._readableStreamController) {
+                                // Is a ReadableStream. Test based on
+                                // IsReadableStream in reference
+                                // implementation.
+                                activeStreamReader = chunk.getReader();
+                                return read();
+                            } else if (chunk.then && typeof chunk.then === 'function') {
+                                // Looks like a Promise.
+                                return chunk.then(val => readReturn(val, false));
+                            }
                         }
+                        return readReturn(chunk, false);
                     });
             },
             cancel: function cancel(reason) {
@@ -150,7 +215,13 @@ function evalTransform(ctx) {
     };
 }
 
-function readerToUnderlyingSource(reader, controller) {
+/**
+ * Adapt a Reader to an UnderlyingSource, for wrapping into a ReadableStream.
+ *
+ * @param {Reader} reader
+ * @return {UnderlyingSource} to be used with ReadableStream constructor.
+ */
+function readerToUnderlyingSource(reader) {
     return {
         pull: controller => {
             return reader.read()
@@ -172,5 +243,6 @@ module.exports = {
     matchTransform: matchTransform,
     evalTransform: evalTransform,
     makeArrayStream: makeArrayStream,
+    streamToArray: streamToArray,
 };
 

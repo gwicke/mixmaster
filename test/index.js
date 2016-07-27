@@ -3,22 +3,39 @@
 const mm = require('../index.js');
 const EleMatch = require('elematch');
 
-// Strawman
-function test() {
-    const handler = function(node) { return function() { return node.outerHTML; }; };
-    const matcher = new EleMatch({
-        'test-element[foo="bar"]': handler,
-        'foo-bar': handler,
-    });
-    const matchFn = matcher.matchAll.bind(matcher);
-    const inStream = mm.makeArrayStream(["<html><body><div>"
-        + "<test-element foo='bar'>foo</test-element>"
-        + "</div></body>"]);
-    const transformedStream = mm.transformStream(inStream, [
-            mm.matchTransform(matchFn),
+/**
+ * General setup
+ */
+const handler = function(node) {
+    // Simplistic runtime handler, which lets us reuse match structures
+    // between renders. For parallel & once-only content processing, we
+    // could just do whatever we need to do & return a Promise directly.
+    return function() {
+        return node.outerHTML;
+    };
+};
+const matcher = new EleMatch({
+    'test-element[foo="bar"]': handler,
+    'foo-bar': handler,
+});
+const elematchFn = matcher.matchAll.bind(matcher);
+const testDoc = ["<html><body><div>"
+    + "<test-element foo='bar'>foo</test-element>"
+    + "</div></body>"];
+
+// Pre-compile the test doc into a template (array of chunks). Our handler
+// returns functions for dynamic elements, so that we can re-evaluate the
+// template at runtime.
+const tplStream = mm.transformStream(testDoc, [
+        mm.matchTransform(elematchFn),
+]);
+
+function evalTemplate(tpl) {
+    // Set up the stream transforms & get the reader.
+    const reader = mm.transformStream(tpl, [
             mm.evalTransform({})
-    ]);
-    const reader = transformedStream.getReader();
+    ]).getReader();
+
     // Consume the stream.
     function readChunk() {
         return reader.read()
@@ -26,12 +43,24 @@ function test() {
             if (res.done) {
                 return;
             }
-            console.log('chunk:', res.value);
+            //console.log('chunk:', res.value);
             return readChunk();
         })
         .catch(e => console.log(e.stack));
     }
-    readChunk();
+    return readChunk();
 }
 
-test();
+mm.streamToArray(tplStream)
+    .then((tpl) => {
+        console.log(tpl);
+        var startTime = Date.now();
+        var n = 100000;
+        function iter(i) {
+            return evalTemplate(tpl)
+                .then(() => i ? iter(i - 1) : null);
+        }
+        return iter(n).then(() => {
+            console.log((Date.now() - startTime) / n, 'ms per iteration');
+        });
+    });
