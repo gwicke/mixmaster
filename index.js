@@ -1,14 +1,8 @@
 'use strict';
 
-// Benchmarking option. Results of simple repeat eval loop, with minor
-// performance tweaks in the stream reference implementation:
-//
-// node 4.4, native promise: 0.060 ms/iteration
-// node 4.4, bluebird:       0.022 ms/iteration
-// node 6.3, native promise: 0.061 ms/iteration
-// node 6.3, bluebird:       0.014 ms/iteration
-//
+// Benchmarking option & what we'd use server-side.
 // global.Promise = require('bluebird');
+
 const ReadableStream = require("web-streams-polyfill").ReadableStream;
 
 function readReturn(value, done) {
@@ -236,7 +230,6 @@ function readerToUnderlyingSource(reader) {
         cancel: reason => reader.cancel(reason)
     };
 }
-
 
 module.exports = {
     transformStream: transformStream,
