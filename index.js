@@ -13,28 +13,20 @@ function readReturn(value, done) {
 }
 
 /**
- * Duck-typed ReadableStream wrapping an array.
+ * ReadableStream wrapping an array.
  *
  * @param {Array} arr, the array to wrap into a stream.
  * @return {ReadableStream}
  */
-function makeArrayStream(arr) {
-    let i = 0;
-    return {
-        getReader: function getReader() {
-            return {
-                read: () => {
-                    if (i < arr.length) {
-                        let val = arr[i];
-                        i++;
-                        return Promise.resolve(readReturn(val, false));
-                    } else {
-                        return Promise.resolve(readReturn(undefined, true));
-                    }
-                }
-            };
+function arrayToStream(arr) {
+    return new ReadableStream({
+        start(controller) {
+            for (var i = 0; i < arr.length; i++) {
+                controller.enqueue(arr[i]);
+            }
+            controller.close();
         }
-    };
+    });
 }
 
 /**
@@ -82,7 +74,7 @@ function transformStream(input, transforms, options) {
     //   - still need signal completion
 
     if (Array.isArray(input)) {
-        input = makeArrayStream(input);
+        input = arrayToStream(input);
     }
     let reader = input.getReader();
 
@@ -235,7 +227,7 @@ module.exports = {
     transformStream: transformStream,
     matchTransform: matchTransform,
     evalTransform: evalTransform,
-    makeArrayStream: makeArrayStream,
+    arrayToStream: arrayToStream,
     streamToArray: streamToArray,
 };
 

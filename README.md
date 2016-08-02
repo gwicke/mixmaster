@@ -19,14 +19,14 @@ complexity is still very high. Basic functionality like propagating
 backpressure through transforms requires rather complex logic, involving
 several callbacks & reading of buffer states.
 
-Another strike against TransforStream & its cousin WritableStream is that it
-is not actually standardized yet, and not available in any browser.
-Polyfilling is possible, but given the complexity & performance issues this
-seemed to be less than desirable. 
+Another short-term issue with TransforStream & WritableStream is that it is
+not actually standardized yet, and not available in any browser. Polyfilling
+is possible, but given the complexity & performance issues this looks less
+desirable for light-weight transforms. 
 
-Looking for a simpler solution, I realized that the `Reader` interface exposed
-by ReadableStream is really pretty much all we need for stream transformation
-& composition:
+Looking for a simpler solution that still integrates well with the streams
+framework, I realized that the `Reader` interface exposed by ReadableStream is
+really pretty much all we need for stream transformation & composition:
 
 ```javascript
 const reader = readableStream.getReader();
@@ -63,8 +63,9 @@ const outStream = new ReadableStream(readerToUnderlyingSource(secondTransformRea
 
 ## Performance
 
-Results for a simple string eval loop benchmark, with minor performance tweaks
-in the stream reference implementation:
+Results for a simple string eval loop benchmark, with [minor performance
+tweaks in the stream reference
+implementation](https://github.com/whatwg/streams/compare/master...gwicke:performance_improvements):
 
 ```
 node 4.4, native promise: 0.060 ms/iteration
@@ -73,12 +74,13 @@ node 6.3, native promise: 0.061 ms/iteration
 node 6.3, bluebird:       0.014 ms/iteration
 ```
 
-Sadly, v8's Promises are still very slow compared to bluebird. While [v5.3
-promises "20-40%" better Promise
+v8's Promises are still very slow compared to bluebird. While [the v5.3
+announcement mentions "20-40%" better Promise
 performance](http://v8project.blogspot.com/2016/07/v8-release-53.html), it
-will still have some catching up to do. Fortunately, on the server we can
-happily continue to use bluebird, which saw a decent performance boost in Node
-6.
+will still have some catching up to do. In practice, this is not much of an
+issue, as we can continue to use bluebird on the server. It would however be
+nice to eventually get decent performance without having to pull in a third
+party library.
 
 Apart from Promise implementations, profiles show that the final
 ReadableStream is a bottleneck. When cutting that out & using the returned
@@ -89,10 +91,44 @@ node 4.4., bluebird     : 0.00687 ms/iteration
 node 6.3, bluebird      : 0.00457 ms/iteration
 ```
 
-Considering that each `TransformStream` currently involves passing the chunk
-through a) a `WritableStream`, and b) a `ReadableStream`, I think it's clear
-that performance of `TransformStream` is not going to be something to write
-home about, especially with the reference implementation.
+Considering that each `TransformStream` stage in a pipeline currently involves
+passing the chunk through a `WritableStream` *and* `ReadableStream`, it is not
+surprising that the performance using the reference implementation is less
+than ideal. While aggressive optimizations could potentially be applied at the
+level of `stream.pipeThrough(new TransformStream({ transform() {..}, flush()
+{..} }))`, the need to support concurrent `enqueue` calls and thus buffering
+between stages will very likely add a performance tax over simpler
+one-call-at-a-time pull interfaces, even in highly optimized implementations.
+
+## Musings on a push/pull mode for streams
+
+Currently, `ReadableStream` mixes push & pull interfaces in its
+`UnderlyingSource` interface. I do wonder if it would be cleaner to separate
+the two, and focusing only on the `Reader` and [WritableStream
+interfaces](https://streams.spec.whatwg.org/#ws-prototype). The benefit of
+such a change would be that `write`, in contrast to `enqueue`, returns a
+Promise, which makes it significantly more straightforward to handle
+back pressure correctly. It would also reduce the number of overlapping
+interfaces in the streams ecosystem, making it easier to use.
+
+In this alternate scheme, a hypothetical `PushPullStream` would be able to
+operate in two distinct modes: Either `pull` or `push`. When constructed
+without an underlying source (`new PushPullStream()`), it would start out in
+"push" mode, with the [writable
+interface](https://streams.spec.whatwg.org/#ws-prototype) active. For pull
+mode and piping, the stream could either be constructed with an underlying
+Stream or Reader (`new PushPullStream(stream_or_reader)`), or a pull source
+could be dynamically assigned with `stream.pullFrom(stream_or_reader|null)`.
+Switching to pull mode would implicitly disable the push interface, and
+indicate this via the `state` getter (part of the writable interface).
+Attempts to use `write()` et al while in `pull` mode would throw. The
+implementation of `pipeTo` would amount to roughly
+`pipeTo(otherStream) { otherStream.pullFrom(this); return otherStream;
+}`. The separate `pipeThrough` method would no longer be needed.
+
+Such a `PushPullStream` interface would only be exposed by consumers. Pure
+producers would continue to expose only the `Reader`
+interface.
 
 ## See also
 
