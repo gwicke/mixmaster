@@ -16,7 +16,9 @@
     "url": "https://github.com/gwicke/mixmaster/issues"
   },
   "dependencies": {
-    "elematch": "git://github.com/wikimedia/elematch",
     "web-streams-polyfill": "git+https://github.com/gwicke/web-streams-polyfill#spec_performance_improvements"
+  },
+  "devDependencies": {
+    "elematch": "git://github.com/wikimedia/elematch"
   }
 }
