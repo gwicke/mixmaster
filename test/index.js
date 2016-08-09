@@ -18,7 +18,7 @@ const matcher = new EleMatch({
     'test-element[foo="bar"]': handler,
     'foo-bar': handler,
 });
-const elematchFn = matcher.matchAll.bind(matcher);
+const elematchFn = matcher.match.bind(matcher);
 const testDoc = ["<html><body><div>"
     + "<test-element foo='bar'>foo</test-element>"
     + "</div></body>"];
