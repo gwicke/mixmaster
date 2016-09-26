@@ -95,26 +95,27 @@ function transformStream(input, transforms, options) {
  * Wrap a synchronous string match function returning matches & remainder
  * properties in a Reader transform.
  *
- * @param {function} matchFn, a function(chunk: string) ->
- *                   { matches: [Array<string>], remainder: string }
+ * @param {object} matcher, an object exposing the following interface:
+ *   match(chunk: mixed) -> { values: [Array<mixed>], done: boolean }
+ *   reset(), optional; resets internal state in case of incomplete matches.
  * @return {function(Reader) -> Reader}
  */
-function matchTransform(matchFn) {
+function matchTransform(matcher) {
     return function makeReader(reader) {
         let curMatch = {
-            matches: [],
-            remainder: '',
+            values: [],
+            done: false,
         };
         return {
             // No start() handler.
             read: function read() {
-                if (curMatch.matches.length) {
-                    let chunk = curMatch.matches.shift();
+                if (curMatch.values.length) {
+                    let chunk = curMatch.values.shift();
                     if (typeof chunk === 'string') {
                         // Coalesce string chunks for efficiency
-                        while (curMatch.matches.length
-                                && (typeof curMatch.matches[0]) === 'string') {
-                            chunk += curMatch.matches.shift();
+                        while (curMatch.values.length
+                                && (typeof curMatch.values[0]) === 'string') {
+                            chunk += curMatch.values.shift();
                         }
                     }
                     return Promise.resolve(readReturn(chunk, false));
@@ -122,14 +123,17 @@ function matchTransform(matchFn) {
                     return reader.read()
                         .then(res => {
                             if (res.done) {
-                                if (curMatch.remainder) {
-                                    curMatch.matches.push(curMatch.remainder);
-                                    curMatch.remainder = '';
-                                    return read();
+                                if (!curMatch.done) {
+                                    if (matcher.reset) {
+                                        matcher.reset();
+                                    }
+                                    throw new Error("MatchTransform: No full match, but input stream terminated!");
                                 }
+                                // Prepare for next match
+                                curMatch.done = true;
                                 return readReturn(undefined, true);
                             }
-                            curMatch = matchFn(curMatch.remainder + res.value);
+                            curMatch = matcher.match(res.value);
                             return read();
                         });
                 }
