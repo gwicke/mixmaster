@@ -1,12 +1,12 @@
 {
   "name": "wikimedia-mixmaster",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Merge and transform web streams and templates into one ReadableStream.",
   "main": "lib/index.js",
   "browser": "dist/index.js",
   "scripts": {
     "test": "node test/index",
-    "build": "browserify --exclude web-streams-polyfill lib/index.js -o dist/index.js",
+    "build": "browserify --exclude web-streams-polyfill --no-bf lib/index.js -o dist/index.js",
     "prepublish": "npm run build"
   },
   "repository": {
