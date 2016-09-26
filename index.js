@@ -3,7 +3,9 @@
 // Benchmarking option & what we'd use server-side.
 // global.Promise = require('bluebird');
 
-const ReadableStream = require("web-streams-polyfill").ReadableStream;
+if (!global.ReadableStream) {
+    global.ReadableStream = require("web-streams-polyfill").ReadableStream;
+}
 
 function readReturn(value, done) {
     return {

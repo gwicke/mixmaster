@@ -3,8 +3,11 @@
   "version": "0.1.1",
   "description": "Merge and transform web streams and templates into one ReadableStream.",
   "main": "index.js",
+  "browser": "dist/index.js",
   "scripts": {
-    "test": "node test/index"
+    "test": "node test/index",
+    "build": "browserify --exclude node-web-streams index.js -o dist/index.js",
+    "prepublish": "npm run build"
   },
   "repository": {
     "type": "git",
