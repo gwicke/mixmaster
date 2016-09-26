@@ -18,7 +18,6 @@ const matcher = new EleMatch({
     'test-element[foo="bar"]': handler,
     'foo-bar': handler,
 });
-const elematchFn = matcher.match.bind(matcher);
 const testDoc = ["<html><body><div>"
     + "<test-element foo='bar'>foo</test-element>"
     + "</div></body>"];
@@ -27,7 +26,7 @@ const testDoc = ["<html><body><div>"
 // returns functions for dynamic elements, so that we can re-evaluate the
 // template at runtime.
 const tplStream = mm.transformStream(testDoc, [
-        mm.matchTransform(elematchFn),
+        mm.matchTransform(matcher),
 ]);
 
 function evalTemplate(tpl) {
