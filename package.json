@@ -1,12 +1,11 @@
 {
   "name": "wikimedia-mixmaster",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Merge and transform web streams and templates into one ReadableStream.",
-  "main": "lib/index.js",
+  "main": "index_node.js",
+  "browser": "lib/index.js",
   "scripts": {
-    "test": "node test/index",
-    "build": "browserify --exclude web-streams-polyfill --no-bf lib/index.js -o dist/index.js",
-    "prepublish": "npm run build"
+    "test": "node test/index"
   },
   "repository": {
     "type": "git",
@@ -18,10 +17,9 @@
     "url": "https://github.com/gwicke/mixmaster/issues"
   },
   "dependencies": {
-    "elematch": "^1.0.0",
     "web-streams-polyfill": "git+https://github.com/gwicke/web-streams-polyfill#spec_performance_improvements"
   },
   "devDependencies": {
-    "browserify": "^13.1.0"
+    "elematch": "^1.0.0"
   }
 }

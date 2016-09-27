@@ -1,6 +1,6 @@
 'use strict';
 
-const mm = require('../lib/index.js');
+const mm = require('../index.js');
 const EleMatch = require('elematch');
 
 /**
