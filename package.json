@@ -1,6 +1,6 @@
 {
   "name": "wikimedia-mixmaster",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Merge and transform web streams and templates into one ReadableStream.",
   "main": "lib/index.js",
   "scripts": {
