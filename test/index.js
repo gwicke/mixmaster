@@ -1,6 +1,6 @@
 'use strict';
 
-const mm = require('../index.js');
+const streamUtil = require('../index.js');
 const EleMatch = require('elematch');
 
 /**
@@ -14,43 +14,25 @@ const handler = function(node) {
         return node.outerHTML;
     };
 };
-const matcher = new EleMatch({
-    'test-element[foo="bar"]': handler,
-    'foo-bar': handler,
-});
+const matcher = new EleMatch([
+    { selector: 'test-element[foo="bar"]', handler },
+    { selector: 'foo-bar', handler },
+]);
 const testDoc = ["<html><body><div>"
     + "<test-element foo='bar'>foo</test-element>"
     + "</div></body>"];
 
-// Pre-compile the test doc into a template (array of chunks). Our handler
-// returns functions for dynamic elements, so that we can re-evaluate the
-// template at runtime.
-const tplStream = mm.transformStream(testDoc, [
-        mm.matchTransform(matcher),
-]);
 
 function evalTemplate(tpl) {
     // Set up the stream transforms & get the reader.
-    const reader = mm.transformStream(tpl, [
-            mm.evalTransform({})
-    ]).getReader();
-
-    // Consume the stream.
-    function readChunk() {
-        return reader.read()
-        .then(res => {
-            if (res.done) {
-                return;
-            }
-            //console.log('chunk:', res.value);
-            return readChunk();
-        })
-        .catch(e => console.log(e.stack));
-    }
-    return readChunk();
+    const reader = new streamUtil.FlatReader(tpl, {});
+    return streamUtil.readToString(reader);
 }
 
-mm.streamToArray(tplStream)
+// Pre-compile the test doc into a template (array of chunks). Our handler
+// returns functions for dynamic elements, so that we can re-evaluate the
+// template at runtime.
+streamUtil.readToArray(new EleMatch(streamUtil.toReader(testDoc), matcher))
     .then((tpl) => {
         var startTime = Date.now();
         var n = 100000;

@@ -2,7 +2,8 @@
   "predef": [
     "setImmediate",
     "Map",
-    "Set"
+    "Set",
+    "ReadableStream"
   ],
 
   "bitwise": true,
