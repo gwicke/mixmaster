@@ -1,6 +1,6 @@
 {
   "name": "web-stream-util",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Utilities for working with web streams.",
   "main": "index.js",
   "browser": "lib/index.js",
