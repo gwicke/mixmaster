@@ -1,7 +1,7 @@
 'use strict';
 
 const streamUtil = require('../index.js');
-const EleMatch = require('elematch');
+const HTMLTransformReader = require('web-html-stream').HTMLTransformReader;
 
 /**
  * General setup
@@ -14,33 +14,39 @@ const handler = function(node) {
         return node.outerHTML;
     };
 };
-const matcher = new EleMatch([
-    { selector: 'test-element[foo="bar"]', handler },
-    { selector: 'foo-bar', handler },
-]);
-const testDoc = ["<html><body><div>"
+const testDoc = "<html><body><div>"
     + "<test-element foo='bar'>foo</test-element>"
-    + "</div></body>"];
+    + "</div></body>";
 
+const precompiledTemplate = new HTMLTransformReader(testDoc, {
+    transforms: [
+        { selector: 'test-element[foo="bar"]', handler },
+        { selector: 'foo-bar', handler },
+    ]
+}).drainSync();
 
 function evalTemplate(tpl) {
     // Set up the stream transforms & get the reader.
-    const reader = new streamUtil.FlatReader(tpl, {});
-    return streamUtil.readToString(reader);
+    const reader = new streamUtil.FlatStreamReader(tpl, {});
+    return streamUtil.readToArray(reader);
 }
 
 // Pre-compile the test doc into a template (array of chunks). Our handler
 // returns functions for dynamic elements, so that we can re-evaluate the
 // template at runtime.
-streamUtil.readToArray(new EleMatch(streamUtil.toReader(testDoc), matcher))
-    .then((tpl) => {
-        var startTime = Date.now();
-        var n = 100000;
-        function iter(i) {
-            return evalTemplate(tpl)
-                .then(() => i ? iter(i - 1) : null);
-        }
-        return iter(n).then(() => {
-            console.log((Date.now() - startTime) / n, 'ms per iteration');
-        });
+function bench(msg) {
+    var startTime = Date.now();
+    var n = 500000;
+    function iter(i) {
+        return evalTemplate(precompiledTemplate)
+            .then(() => i ? iter(i - 1) : null);
+    }
+    return iter(n).then(() => {
+        console.log(msg, (Date.now() - startTime) / n, 'ms per iteration');
     });
+}
+bench('Native Promise:')
+.then(() => {
+    global.Promise = require('bluebird');
+    return bench('Bluebird:');
+});

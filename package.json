@@ -20,6 +20,7 @@
     "web-streams-polyfill": "^1.2.2"
   },
   "devDependencies": {
-    "elematch": "^1.0.4"
+    "bluebird": "^3.4.6",
+    "web-html-stream": "^2.0.7"
   }
 }
