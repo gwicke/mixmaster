@@ -34,19 +34,17 @@ function evalTemplate(tpl) {
 // Pre-compile the test doc into a template (array of chunks). Our handler
 // returns functions for dynamic elements, so that we can re-evaluate the
 // template at runtime.
-function bench(msg) {
-    var startTime = Date.now();
-    var n = 500000;
-    function iter(i) {
-        return evalTemplate(precompiledTemplate)
-            .then(() => i ? iter(i - 1) : null);
-    }
-    return iter(n).then(() => {
-        console.log(msg, (Date.now() - startTime) / n, 'ms per iteration');
+module.exports = function(kind) {
+  var startTime = Date.now();
+  var n = 50000;
+  var count = 0;
+
+  for (var i = 0; i <= n; i++) {
+    evalTemplate(precompiledTemplate).then(() => {
+      count++;
+      if ( count === n ) {
+        console.log(kind, (Date.now() - startTime) / n, 'ms per iteration');
+      }
     });
+  }
 }
-bench('Native Promise:')
-.then(() => {
-    global.Promise = require('bluebird');
-    return bench('Bluebird:');
-});
